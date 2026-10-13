@@ -14,7 +14,53 @@ import {
   Platform
 } from 'react-native';
 import { mobileApi } from './src/services/api';
-import { CardCredential, User, DynamicQrToken } from './src/types';
+import QRCodeLib from 'qrcode';
+
+function PureQRCode({ value, size = 170 }: { value: string; size?: number }) {
+  const qr = React.useMemo(() => {
+    try {
+      return QRCodeLib.create(value || 'CRDZ', { errorCorrectionLevel: 'M' });
+    } catch (e) {
+      return null;
+    }
+  }, [value]);
+
+  if (!qr) return null;
+  const count = qr.modules.size;
+  const cellSize = Math.max(1, Math.floor(size / count));
+  const actualSize = cellSize * count;
+
+  const rows = [];
+  for (let r = 0; r < count; r++) {
+    const cols = [];
+    for (let c = 0; c < count; c++) {
+      const isDark = qr.modules.get(r, c) === 1;
+      cols.push(
+        <View
+          key={c}
+          style={{
+            width: cellSize,
+            height: cellSize,
+            backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
+          }}
+        />
+      );
+    }
+    rows.push(
+      <View key={r} style={{ flexDirection: 'row' }}>
+        {cols}
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ backgroundColor: '#FFFFFF', padding: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: actualSize, height: actualSize }}>
+        {rows}
+      </View>
+    </View>
+  );
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -514,8 +560,15 @@ export default function App() {
             {/* Dynamic QR Box */}
             <View style={styles.qrCard}>
               <View style={styles.qrMockCode}>
-                <Text style={styles.qrCodeIcon}>[ DYNAMIC QR ]</Text>
-                <Text style={styles.qrCodeToken}>{dynamicQr?.token}</Text>
+                {dynamicQr?.token ? (
+                  <PureQRCode
+                    value={dynamicQr.token}
+                    size={170}
+                  />
+                ) : (
+                  <ActivityIndicator size="large" color="#0A84FF" />
+                )}
+                <Text style={styles.qrCodeToken}>{dynamicQr?.token || 'Generating cryptographic pass...'}</Text>
               </View>
               <Text style={styles.qrCountdown}>⏱️ Valid for {secondsRemaining} seconds</Text>
               <Text style={styles.qrHelp}>Presents single-use cryptographic token to verifier.</Text>
@@ -1119,14 +1172,27 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   qrMockCode: {
-    backgroundColor: '#F1F5F9',
-    width: 200,
-    height: 180,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    width: 220,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  qrWrapper: {
+    padding: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   qrCodeIcon: {
     color: '#0A84FF',
