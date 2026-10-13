@@ -17,7 +17,7 @@
     "build:admin": "npm --prefix admin run build",
     "prisma:generate": "prisma generate --schema=backend/prisma/schema.prisma",
     "postinstall": "prisma generate --schema=backend/prisma/schema.prisma",
-    "build": "prisma generate --schema=backend/prisma/schema.prisma && npm --prefix backend run build && npm --prefix admin run build",
+    "build": "prisma generate --schema=backend/prisma/schema.prisma && npm --prefix backend run build && npm --prefix admin run build && node -e \"const fs = require('fs'); fs.cpSync('admin/dist', 'dist', {recursive: true});\"",
     "seed": "npm --prefix backend run prisma:seed"
   },
   "dependencies": {
