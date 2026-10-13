@@ -7,7 +7,7 @@ const getInitialBaseUrl = (): string => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://localhost:4000/api';
     }
-    return '/api';
+    return 'https://cardzo-xi.vercel.app/api';
   }
   return 'http://localhost:4000/api';
 };

@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import { User, CardCredential, DynamicQrToken } from '../types';
 
-// Android emulators use 10.0.2.2 to access host machine's localhost:4000
-const DEFAULT_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:4000/api' : 'http://localhost:4000/api';
+// Live Cardzo Backend connected to Neon PostgreSQL on Vercel
+const DEFAULT_HOST = 'https://cardzo-xi.vercel.app/api';
 
 class MobileApiService {
   private token: string | null = null;
