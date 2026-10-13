@@ -28,21 +28,30 @@ app.use(express_1.default.urlencoded({ extended: true, limit: '25mb' }));
 // Static asset folders
 app.use('/assets', express_1.default.static(path_1.default.join(__dirname, '../../assets')));
 app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
-// API Routes
-app.use('/api/auth', auth_1.default);
-app.use('/api/cards', cards_1.default);
-app.use('/api/qr', qr_1.default);
-app.use('/api/attendance', attendance_1.default);
-app.use('/api/garud', garud_1.default);
-app.use('/api/admin', admin_1.default);
+// API Routes (mounted under both /api and root to guarantee routing across all deployment topologies)
+const apiRoutes = [
+    { path: 'auth', router: auth_1.default },
+    { path: 'cards', router: cards_1.default },
+    { path: 'qr', router: qr_1.default },
+    { path: 'attendance', router: attendance_1.default },
+    { path: 'garud', router: garud_1.default },
+    { path: 'admin', router: admin_1.default }
+];
+apiRoutes.forEach(({ path: routePath, router }) => {
+    app.use(`/api/${routePath}`, router);
+    app.use(`/${routePath}`, router);
+});
 // Health check
-app.get('/health', (req, res) => {
+const handleHealth = (req, res) => {
     res.json({
         status: 'healthy',
         system: 'Cardzo Identity & Attendance Engine',
+        database: 'Neon PostgreSQL',
         timestamp: new Date().toISOString()
     });
-});
+};
+app.get('/health', handleHealth);
+app.get('/api/health', handleHealth);
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'Endpoint not found.' });
