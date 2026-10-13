@@ -1,0 +1,17 @@
+{
+  "name": "cardzo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cardzo Identity Wallet & Dynamic QR Attendance Platform",
+  "scripts": {
+    "dev": "npm --prefix backend run dev & npm --prefix admin run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:admin": "npm --prefix admin run dev",
+    "dev:mobile": "npm --prefix mobile start",
+    "dev:android": "npm --prefix mobile run android",
+    "build:apk": "cd mobile/android && ./gradlew assembleDebug",
+    "build:admin": "npm --prefix admin run build",
+    "install:all": "npm --prefix backend install && npm --prefix admin install && npm --prefix mobile install",
+    "seed": "npm --prefix backend run prisma:seed"
+  }
+}

@@ -1,0 +1,99 @@
+pluginManagement {
+  def findNodeInPlugin = { ->
+    def candidates = [
+      "/opt/homebrew/bin/node",
+      "/usr/local/bin/node",
+      System.getenv("NODE_BINARY"),
+      "node"
+    ].findAll { it != null }
+    for (candidate in candidates) {
+      if (new File(candidate).exists()) {
+        return candidate
+      }
+    }
+    return "node"
+  }
+  def nodeBin = findNodeInPlugin()
+
+
+  def version = providers.exec {
+    commandLine(nodeBin, "-e", "console.log(require('react-native/package.json').version);")
+  }.standardOutput.asText.get().trim()
+  def (_, reactNativeMinor, reactNativePatch) = version.split("-")[0].tokenize('.').collect { it.toInteger() }
+
+  includeBuild(new File([nodeBin, "--print", "require.resolve('@react-native/gradle-plugin/package.json')"].execute(null, rootDir).text.trim()).getParentFile().toString())
+  if(reactNativeMinor == 74 && reactNativePatch <= 3){
+    includeBuild("react-settings-plugin")
+  }
+}
+
+plugins { id("com.facebook.react.settings") }
+
+def findNode() {
+  def candidates = [
+    "/opt/homebrew/bin/node",
+    "/usr/local/bin/node",
+    System.getenv("NODE_BINARY"),
+    "node"
+  ].findAll { it != null }
+  for (candidate in candidates) {
+    if (new File(candidate).exists()) {
+      return candidate
+    }
+  }
+  return "node"
+}
+def nodeBin = findNode()
+
+def getRNMinorVersion() {
+  def version = providers.exec {
+    commandLine(findNode(), "-e", "console.log(require('react-native/package.json').version);")
+  }.standardOutput.asText.get().trim()
+
+  def coreVersion = version.split("-")[0]
+  def (major, minor, patch) = coreVersion.tokenize('.').collect { it.toInteger() }
+
+  return minor
+}
+
+if (getRNMinorVersion() >= 75) {
+  extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
+    if (System.getenv('EXPO_UNSTABLE_CORE_AUTOLINKING') == '1') {
+      println('\u001B[32mUsing expo-modules-autolinking as core autolinking source\u001B[0m')
+      def command = [
+        nodeBin,
+        '--no-warnings',
+        '--eval',
+        'require(require.resolve(\'expo-modules-autolinking\', { paths: [require.resolve(\'expo/package.json\')] }))(process.argv.slice(1))',
+        'react-native-config',
+        '--json',
+        '--platform',
+        'android'
+      ].toList()
+      ex.autolinkLibrariesFromCommand(command)
+    } else {
+      ex.autolinkLibrariesFromCommand()
+    }
+  }
+}
+
+rootProject.name = 'Cardzo Identity & Wallet'
+
+dependencyResolutionManagement {
+  versionCatalogs {
+    reactAndroidLibs {
+      from(files(new File([nodeBin, "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim(), "../gradle/libs.versions.toml")))
+    }
+  }
+}
+
+apply from: new File([nodeBin, "--print", "require.resolve('expo/package.json')"].execute(null, rootDir).text.trim(), "../scripts/autolinking.gradle");
+useExpoModules()
+
+if (getRNMinorVersion() < 75) {
+  apply from: new File([nodeBin, "--print", "require.resolve('@react-native-community/cli-platform-android/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim(), "../native_modules.gradle");
+  applyNativeModulesSettingsGradle(settings)
+}
+
+include ':app'
+includeBuild(new File([nodeBin, "--print", "require.resolve('@react-native/gradle-plugin/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile())
