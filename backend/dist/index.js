@@ -47,8 +47,11 @@ app.get('/health', (req, res) => {
 app.use((req, res) => {
     res.status(404).json({ error: 'Endpoint not found.' });
 });
-// Start Server
-app.listen(PORT, () => {
-    console.log(`🚀 Cardzo Backend API running on http://localhost:${PORT}`);
-    console.log(`📡 Ready for Cardholder mobile app, Garud scanner, and Admin portal.`);
-});
+// Start Server (only listen when run standalone, Vercel uses exported handler)
+if (!process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`🚀 Cardzo Backend API running on http://localhost:${PORT}`);
+        console.log(`📡 Ready for Cardholder mobile app, Garud scanner, and Admin portal.`);
+    });
+}
+exports.default = app;
