@@ -468,6 +468,14 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                   <span>Time: {new Date(scanResult.timestamp).toLocaleTimeString()}</span>
                   <span>Station: {gateLocation}</span>
                 </div>
+
+                <button
+                  onClick={startCamera}
+                  className="btn-primary"
+                  style={{ width: '100%', marginTop: '16px', justifyContent: 'center' }}
+                >
+                  <Camera size={16} /> Scan Next Pass
+                </button>
               </div>
             ) : scanResult.success && scanResult.action === 'CHECK_OUT' ? (
               /* State B -> State A: Check-Out Success */
@@ -512,6 +520,14 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                   <span>Departure: {new Date(scanResult.timestamp).toLocaleTimeString()}</span>
                   <span>Station: {gateLocation}</span>
                 </div>
+
+                <button
+                  onClick={startCamera}
+                  className="btn-primary"
+                  style={{ width: '100%', marginTop: '16px', justifyContent: 'center' }}
+                >
+                  <Camera size={16} /> Scan Next Pass
+                </button>
               </div>
             ) : (
               /* Failure / Expired / Replay Alert */
@@ -537,6 +553,14 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                 <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
                   Action Required: Request the cardholder to present a refreshed dynamic pass in Cardzo.
                 </div>
+
+                <button
+                  onClick={startCamera}
+                  className="btn-secondary"
+                  style={{ width: '100%', marginTop: '16px', justifyContent: 'center' }}
+                >
+                  <Camera size={16} /> Scan Next Pass
+                </button>
               </div>
             )}
           </div>
