@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Smartphone, Building, KeyRound, Lock, AlertCircle, ArrowRight, CheckCircle2, UserCheck } from 'lucide-react';
+import { Shield, Smartphone, Building, KeyRound, Lock, AlertCircle, ArrowRight, CheckCircle2, UserCheck, Settings } from 'lucide-react';
 import { api } from '../api';
 import { User } from '../types';
 
@@ -85,6 +85,8 @@ export const RoleLoginView: React.FC<RoleLoginViewProps> = ({ onLoginSuccess }) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [serverUrl, setServerUrl] = useState(api.getBaseUrl());
+  const [showServerConfig, setShowServerConfig] = useState(false);
 
   const activeMeta = ROLE_METADATA[selectedRole];
 
@@ -475,6 +477,81 @@ export const RoleLoginView: React.FC<RoleLoginViewProps> = ({ onLoginSuccess }) 
               <KeyRound size={16} />
               <span>1-Click Demo Login as {activeMeta.demoName}</span>
             </button>
+
+            {/* Server Endpoint Config */}
+            <div style={{ marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setShowServerConfig(!showServerConfig)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  margin: '0 auto'
+                }}
+              >
+                <Settings size={13} />
+                <span>API Endpoint: {serverUrl}</span>
+              </button>
+
+              {showServerConfig && (
+                <div style={{
+                  marginTop: '10px',
+                  padding: '12px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid var(--border-glass)'
+                }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                    Backend API URL:
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={serverUrl}
+                      onChange={(e) => setServerUrl(e.target.value)}
+                      placeholder="https://cardzo-backend.vercel.app/api"
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        background: 'rgba(0, 0, 0, 0.4)',
+                        border: '1px solid var(--border-glass)',
+                        borderRadius: '6px',
+                        color: '#FFFFFF',
+                        fontSize: '0.8rem'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        api.setBaseUrl(serverUrl);
+                        setShowServerConfig(false);
+                      }}
+                      style={{
+                        padding: '8px 14px',
+                        background: activeMeta.accentColor,
+                        color: '#FFFFFF',
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        border: 'none'
+                      }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    Enter your live backend API URL (ends with <code>/api</code>).
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </form>
       </div>

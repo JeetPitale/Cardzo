@@ -1,19 +1,46 @@
-const API_BASE = 'http://localhost:4000/api';
+const getInitialBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('cardzo_api_base');
+    if (saved) return saved;
+    const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+    if (envUrl) return envUrl;
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:4000/api';
+    }
+    return '/api';
+  }
+  return 'http://localhost:4000/api';
+};
 
 class ApiClient {
   private token: string | null = null;
   private onSessionRevokedCallback: (() => void) | null = null;
+  private baseUrl: string = getInitialBaseUrl();
 
   constructor() {
-    this.token = localStorage.getItem('cardzo_auth_token');
+    this.token = typeof localStorage !== 'undefined' ? localStorage.getItem('cardzo_auth_token') : null;
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  setBaseUrl(url: string) {
+    const formatted = url.endsWith('/api') ? url : `${url.replace(/\/$/, '')}/api`;
+    this.baseUrl = formatted;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('cardzo_api_base', formatted);
+    }
   }
 
   setToken(token: string | null) {
     this.token = token;
-    if (token) {
-      localStorage.setItem('cardzo_auth_token', token);
-    } else {
-      localStorage.removeItem('cardzo_auth_token');
+    if (typeof localStorage !== 'undefined') {
+      if (token) {
+        localStorage.setItem('cardzo_auth_token', token);
+      } else {
+        localStorage.removeItem('cardzo_auth_token');
+      }
     }
   }
 
@@ -26,7 +53,7 @@ class ApiClient {
   }
 
   async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${API_BASE}${endpoint}`;
+    const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...((options.headers as Record<string, string>) || {})
@@ -56,6 +83,9 @@ class ApiClient {
 
       return data;
     } catch (err: any) {
+      if (err.message === 'Load failed' || err.message === 'Failed to fetch' || err.name === 'TypeError') {
+        throw new Error(`Cannot reach backend at "${this.baseUrl}". Please verify the backend URL is deployed and accessible.`);
+      }
       throw err;
     }
   }

@@ -20,14 +20,14 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
     setDemoTokenLoading(true);
     try {
       // Temporarily login as Aarav to generate dynamic token
-      const loginRes = await fetch('http://localhost:4000/api/auth/login', {
+      const loginRes = await fetch(`${api.getBaseUrl()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 'aarav@cardzo.io', password: 'Password123!', deviceId: 'aarav-temp' })
       });
       const loginData = await loginRes.json();
       
-      const qrRes = await fetch('http://localhost:4000/api/qr/generate', {
+      const qrRes = await fetch(`${api.getBaseUrl()}/qr/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -48,7 +48,7 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
 
   const initStudentSession = async () => {
     try {
-      const res = await fetch('http://localhost:4000/api/auth/login', {
+      const res = await fetch(`${api.getBaseUrl()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -63,14 +63,14 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
       setStudentToken(data.token);
 
       // Load cards
-      const cardsRes = await fetch('http://localhost:4000/api/cards', {
+      const cardsRes = await fetch(`${api.getBaseUrl()}/cards`, {
         headers: { Authorization: `Bearer ${data.token}` }
       });
       const cardsData = await cardsRes.json();
       setCards(cardsData.cards || []);
 
       // Load attendance state
-      const attRes = await fetch('http://localhost:4000/api/attendance/current', {
+      const attRes = await fetch(`${api.getBaseUrl()}/attendance/current`, {
         headers: { Authorization: `Bearer ${data.token}` }
       });
       const attData = await attRes.json();
@@ -106,7 +106,7 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
     setGeneratingQr(true);
     try {
       const selectedCard = cards[activeCardIndex];
-      const res = await fetch('http://localhost:4000/api/qr/generate', {
+      const res = await fetch(`${api.getBaseUrl()}/qr/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -132,7 +132,7 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
       setQrDataUrl(qrCodeUrl);
 
       // Refresh attendance status
-      const attRes = await fetch('http://localhost:4000/api/attendance/current', {
+      const attRes = await fetch(`${api.getBaseUrl()}/attendance/current`, {
         headers: { Authorization: `Bearer ${studentToken}` }
       });
       const attData = await attRes.json();
@@ -154,7 +154,7 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
     if (!studentToken) return;
     setSavingCard(true);
     try {
-      await fetch('http://localhost:4000/api/cards/scan', {
+      await fetch(`${api.getBaseUrl()}/cards/scan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
