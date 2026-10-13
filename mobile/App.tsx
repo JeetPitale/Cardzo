@@ -496,7 +496,7 @@ export default function App() {
           </View>
         )}
 
-        {activeTab === 'garud' && (
+        {activeTab === 'garud' && currentUser?.role !== 'CARDHOLDER' && (
           <View>
             <Text style={styles.sectionHeader}>GARUD GATE VERIFIER TERMINAL</Text>
             <View style={styles.garudBox}>
@@ -621,9 +621,11 @@ export default function App() {
         <TouchableOpacity onPress={() => setActiveTab('attendance')} style={styles.navItem}>
           <Text style={[styles.navText, activeTab === 'attendance' && styles.navTextActive]}>Attendance</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab('garud')} style={styles.navItem}>
-          <Text style={[styles.navText, activeTab === 'garud' && styles.navTextActive]}>Garud Scan</Text>
-        </TouchableOpacity>
+        {currentUser?.role !== 'CARDHOLDER' && (
+          <TouchableOpacity onPress={() => setActiveTab('garud')} style={styles.navItem}>
+            <Text style={[styles.navText, activeTab === 'garud' && styles.navTextActive]}>Garud Scan</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => setActiveTab('profile')} style={styles.navItem}>
           <Text style={[styles.navText, activeTab === 'profile' && styles.navTextActive]}>Profile</Text>
         </TouchableOpacity>
