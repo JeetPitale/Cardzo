@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { QrCode, Shield, CheckCircle2, XCircle, AlertTriangle, Clock, RefreshCw, Zap, ArrowRight, User, Camera, CameraOff, Video } from 'lucide-react';
+import { QrCode, Shield, CheckCircle2, XCircle, AlertTriangle, Clock, RefreshCw, Zap, ArrowRight, User, Camera, CameraOff, Video, FlipHorizontal, Image as ImageIcon } from 'lucide-react';
 import { api } from '../api';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 interface GarudScannerProps {
   onRefreshData: () => void;
@@ -17,7 +17,10 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
   // Camera scanner state
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([]);
+  const [activeCamIndex, setActiveCamIndex] = useState(0);
   const qrScannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Helper to fetch live token from Aarav for instant demo test
   const [demoTokenLoading, setDemoTokenLoading] = useState(false);
@@ -36,7 +39,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
       if (isSuccess) {
         osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.12);
       }
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.16);
 
       osc.connect(gain);
@@ -61,60 +64,118 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
     }
   };
 
-  const startCamera = async () => {
+  const startCamera = async (targetIndex?: number) => {
     setCameraError(null);
     setScanResult(null);
 
     try {
       await stopCamera();
 
-      const qrScanner = new Html5Qrcode('garud-qr-reader');
+      // Query available cameras
+      let devList = cameras;
+      if (!devList || devList.length === 0) {
+        devList = await Html5Qrcode.getCameras().catch(() => []);
+        setCameras(devList);
+      }
+
+      const qrScanner = new Html5Qrcode('garud-qr-reader', {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        verbose: false
+      });
       qrScannerRef.current = qrScanner;
 
       const qrCodeSuccessCallback = async (decodedText: string) => {
         playScanBeep(true);
         setTokenInput(decodedText);
-        // Stop camera on success to avoid re-triggering
         await stopCamera();
         handleVerify(decodedText);
       };
 
-      // Try environment (back) camera first, fallback to user camera
-      const config = {
+      const qrConfig = {
         fps: 15,
-        qrbox: { width: 240, height: 240 },
-        aspectRatio: 1.0
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          return {
+            width: Math.floor(minEdge * 0.88),
+            height: Math.floor(minEdge * 0.88)
+          };
+        }
       };
 
-      try {
+      const camIdx = typeof targetIndex === 'number' ? targetIndex : activeCamIndex;
+      if (devList && devList.length > 0) {
+        const selectedCam = devList[camIdx] || devList[0];
+        setActiveCamIndex(camIdx);
         await qrScanner.start(
-          { facingMode: 'environment' },
-          config,
+          selectedCam.id,
+          qrConfig,
           qrCodeSuccessCallback,
           () => {}
         );
-        setIsCameraActive(true);
-      } catch (backCamErr) {
-        // Fallback to front/user camera (e.g. laptop webcam)
-        await qrScanner.start(
-          { facingMode: 'user' },
-          config,
-          qrCodeSuccessCallback,
-          () => {}
-        );
-        setIsCameraActive(true);
+      } else {
+        // Fallback to constraints
+        try {
+          await qrScanner.start(
+            { facingMode: 'environment' },
+            qrConfig,
+            qrCodeSuccessCallback,
+            () => {}
+          );
+        } catch {
+          await qrScanner.start(
+            { facingMode: 'user' },
+            qrConfig,
+            qrCodeSuccessCallback,
+            () => {}
+          );
+        }
       }
+
+      setIsCameraActive(true);
     } catch (err: any) {
       console.error('Camera start error:', err);
       setIsCameraActive(false);
-      setCameraError(err.message || 'Unable to access camera. Please check camera permissions.');
+      setCameraError(err.message || 'Unable to access camera. Please check camera permissions in your browser.');
+    }
+  };
+
+  const handleFlipCamera = async () => {
+    if (cameras.length <= 1) return;
+    const nextIdx = (activeCamIndex + 1) % cameras.length;
+    await startCamera(nextIdx);
+  };
+
+  const handleScanFromFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setScanning(true);
+    try {
+      let scanner = qrScannerRef.current;
+      if (!scanner) {
+        scanner = new Html5Qrcode('garud-qr-reader', {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false
+        });
+        qrScannerRef.current = scanner;
+      }
+
+      const decodedText = await scanner.scanFile(file, true);
+      playScanBeep(true);
+      setTokenInput(decodedText);
+      handleVerify(decodedText);
+    } catch (err: any) {
+      playScanBeep(false);
+      alert('Could not find a valid Cardzo QR code in this image. Please ensure the QR is clear and well-lit.');
+    } finally {
+      setScanning(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const fetchLiveStudentToken = async () => {
     setDemoTokenLoading(true);
     try {
-      // Temporarily login as Aarav to generate dynamic token
       const loginRes = await fetch(`${api.getBaseUrl()}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -142,7 +203,6 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
   const handleVerify = async (tokenToUse?: string) => {
     const activeToken = tokenToUse || tokenInput;
     if (!activeToken) {
-      // If token input is empty, trigger camera open instead
       startCamera();
       return;
     }
@@ -151,7 +211,6 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
     setScanResult(null);
 
     try {
-      // Ensure we are authenticated as Garud or Admin
       const res = await api.request('/garud/verify', {
         method: 'POST',
         body: JSON.stringify({
@@ -188,7 +247,6 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
   useEffect(() => {
     loadRecentActivity();
     return () => {
-      // Cleanup camera on unmount
       if (qrScannerRef.current && qrScannerRef.current.isScanning) {
         qrScannerRef.current.stop().catch(() => {});
       }
@@ -233,27 +291,39 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
       <div className="responsive-two-col">
         {/* Left Column: Live Camera Scanner & Viewfinder */}
         <div className="glass-panel" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <QrCode size={18} color="var(--cardzo-blue)" /> Optical Camera Scanner
             </h2>
-            {isCameraActive ? (
-              <button
-                onClick={stopCamera}
-                className="btn-danger"
-                style={{ fontSize: '0.78rem', padding: '6px 12px' }}
-              >
-                <CameraOff size={14} /> Stop Camera
-              </button>
-            ) : (
-              <button
-                onClick={startCamera}
-                className="btn-primary"
-                style={{ fontSize: '0.78rem', padding: '6px 12px' }}
-              >
-                <Camera size={14} /> Open Scanner
-              </button>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {isCameraActive && cameras.length > 1 && (
+                <button
+                  onClick={handleFlipCamera}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.78rem', padding: '6px 10px', gap: '4px' }}
+                  title="Switch to next camera"
+                >
+                  <FlipHorizontal size={14} /> Flip Camera
+                </button>
+              )}
+              {isCameraActive ? (
+                <button
+                  onClick={stopCamera}
+                  className="btn-danger"
+                  style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                >
+                  <CameraOff size={14} /> Stop Camera
+                </button>
+              ) : (
+                <button
+                  onClick={() => startCamera()}
+                  className="btn-primary"
+                  style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                >
+                  <Camera size={14} /> Open Scanner
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Scanner Viewfinder Box */}
@@ -270,6 +340,29 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
             overflow: 'hidden',
             marginBottom: '18px'
           }}>
+            {/* Live Camera Scanner Active Indicator */}
+            {isCameraActive && (
+              <div style={{
+                position: 'absolute',
+                top: '12px',
+                left: '12px',
+                zIndex: 20,
+                background: 'rgba(0, 0, 0, 0.75)',
+                border: '1px solid rgba(48, 209, 88, 0.4)',
+                borderRadius: '20px',
+                padding: '4px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.74rem',
+                color: '#34D399',
+                backdropFilter: 'blur(8px)'
+              }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#30D158', display: 'inline-block', boxShadow: '0 0 8px #30D158' }} />
+                <span>Live Optical Scanner Active</span>
+              </div>
+            )}
+
             {/* The HTML5 QR Code Mount Element */}
             <div
               id="garud-qr-reader"
@@ -283,7 +376,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
             {/* Standby State when camera is NOT running */}
             {!isCameraActive && (
               <div
-                onClick={startCamera}
+                onClick={() => startCamera()}
                 style={{
                   width: '100%',
                   height: '260px',
@@ -338,6 +431,15 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
             )}
           </div>
 
+          {/* Hidden File Input for Scan from Screenshot/Photo */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleScanFromFile}
+          />
+
           {/* Action Row & Manual Input Fallback */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -373,6 +475,15 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                 {scanning ? 'Verifying...' : tokenInput.trim() ? 'Verify Token' : 'Open Camera'}
               </button>
             </div>
+
+            {/* Scan from Photo / Screenshot Option */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="btn-secondary"
+              style={{ fontSize: '0.8rem', padding: '8px 12px', justifyContent: 'center', gap: '8px', width: '100%' }}
+            >
+              <ImageIcon size={15} color="#38BDF8" /> Scan from QR Image / Screenshot
+            </button>
 
             {/* Quick Demo Helpers */}
             <div style={{
@@ -470,7 +581,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                 </div>
 
                 <button
-                  onClick={startCamera}
+                  onClick={() => startCamera()}
                   className="btn-primary"
                   style={{ width: '100%', marginTop: '16px', justifyContent: 'center' }}
                 >
@@ -522,7 +633,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                 </div>
 
                 <button
-                  onClick={startCamera}
+                  onClick={() => startCamera()}
                   className="btn-primary"
                   style={{ width: '100%', marginTop: '16px', justifyContent: 'center' }}
                 >
@@ -555,7 +666,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                 </div>
 
                 <button
-                  onClick={startCamera}
+                  onClick={() => startCamera()}
                   className="btn-secondary"
                   style={{ width: '100%', marginTop: '16px', justifyContent: 'center' }}
                 >

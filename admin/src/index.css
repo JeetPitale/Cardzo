@@ -450,17 +450,26 @@ input, select, textarea {
 #garud-qr-reader {
   width: 100% !important;
   border: none !important;
-  background: transparent !important;
+  background: #000000 !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden !important;
 }
 
 #garud-qr-reader video {
   width: 100% !important;
-  height: 260px !important;
-  object-fit: cover !important;
+  max-height: 380px !important;
   border-radius: var(--radius-md) !important;
 }
 
 #garud-qr-reader img {
+  display: none !important;
+}
+
+#garud-qr-reader__scan_region {
+  background: transparent !important;
+}
+
+#garud-qr-reader__dashboard {
   display: none !important;
 }
 
