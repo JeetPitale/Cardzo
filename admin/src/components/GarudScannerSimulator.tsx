@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { QrCode, Shield, CheckCircle2, XCircle, AlertTriangle, Clock, RefreshCw, Zap, ArrowRight, User } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { QrCode, Shield, CheckCircle2, XCircle, AlertTriangle, Clock, RefreshCw, Zap, ArrowRight, User, Camera, CameraOff, Video } from 'lucide-react';
 import { api } from '../api';
+import { Html5Qrcode } from 'html5-qrcode';
 
 interface GarudScannerProps {
   onRefreshData: () => void;
@@ -13,8 +14,102 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
   const [scanResult, setScanResult] = useState<any>(null);
   const [recentVerifications, setRecentVerifications] = useState<any[]>([]);
 
+  // Camera scanner state
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const qrScannerRef = useRef<Html5Qrcode | null>(null);
+
   // Helper to fetch live token from Aarav for instant demo test
   const [demoTokenLoading, setDemoTokenLoading] = useState(false);
+
+  // Play pleasant audible confirmation chime
+  const playScanBeep = (isSuccess: boolean = true) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = isSuccess ? 'sine' : 'sawtooth';
+      osc.frequency.setValueAtTime(isSuccess ? 880 : 330, ctx.currentTime);
+      if (isSuccess) {
+        osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.12);
+      }
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.16);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.16);
+    } catch (e) {
+      // Audio not permitted or unavailable
+    }
+  };
+
+  const stopCamera = async () => {
+    try {
+      if (qrScannerRef.current && qrScannerRef.current.isScanning) {
+        await qrScannerRef.current.stop();
+      }
+      qrScannerRef.current = null;
+    } catch (err) {
+      console.warn('Error stopping scanner:', err);
+    } finally {
+      setIsCameraActive(false);
+    }
+  };
+
+  const startCamera = async () => {
+    setCameraError(null);
+    setScanResult(null);
+
+    try {
+      await stopCamera();
+
+      const qrScanner = new Html5Qrcode('garud-qr-reader');
+      qrScannerRef.current = qrScanner;
+
+      const qrCodeSuccessCallback = async (decodedText: string) => {
+        playScanBeep(true);
+        setTokenInput(decodedText);
+        // Stop camera on success to avoid re-triggering
+        await stopCamera();
+        handleVerify(decodedText);
+      };
+
+      // Try environment (back) camera first, fallback to user camera
+      const config = {
+        fps: 15,
+        qrbox: { width: 240, height: 240 },
+        aspectRatio: 1.0
+      };
+
+      try {
+        await qrScanner.start(
+          { facingMode: 'environment' },
+          config,
+          qrCodeSuccessCallback,
+          () => {}
+        );
+        setIsCameraActive(true);
+      } catch (backCamErr) {
+        // Fallback to front/user camera (e.g. laptop webcam)
+        await qrScanner.start(
+          { facingMode: 'user' },
+          config,
+          qrCodeSuccessCallback,
+          () => {}
+        );
+        setIsCameraActive(true);
+      }
+    } catch (err: any) {
+      console.error('Camera start error:', err);
+      setIsCameraActive(false);
+      setCameraError(err.message || 'Unable to access camera. Please check camera permissions.');
+    }
+  };
 
   const fetchLiveStudentToken = async () => {
     setDemoTokenLoading(true);
@@ -46,7 +141,11 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
 
   const handleVerify = async (tokenToUse?: string) => {
     const activeToken = tokenToUse || tokenInput;
-    if (!activeToken) return;
+    if (!activeToken) {
+      // If token input is empty, trigger camera open instead
+      startCamera();
+      return;
+    }
 
     setScanning(true);
     setScanResult(null);
@@ -62,9 +161,11 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
       });
 
       setScanResult(res);
+      playScanBeep(true);
       onRefreshData();
       loadRecentActivity();
     } catch (err: any) {
+      playScanBeep(false);
       setScanResult({
         success: false,
         status: 'VERIFICATION_REJECTED',
@@ -86,6 +187,12 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
 
   useEffect(() => {
     loadRecentActivity();
+    return () => {
+      // Cleanup camera on unmount
+      if (qrScannerRef.current && qrScannerRef.current.isScanning) {
+        qrScannerRef.current.stop().catch(() => {});
+      }
+    };
   }, []);
 
   return (
@@ -97,7 +204,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
             <span className="badge badge-warning">🛡️ AUTHORIZED OPERATOR MODE</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '4px' }}>
-            Instant dynamic QR scanner for campus security and turnstile operators with zero-trust backend validation.
+            Optical camera QR scanner for campus security and turnstile operators with zero-trust validation.
           </p>
         </div>
 
@@ -124,62 +231,119 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
       </div>
 
       <div className="responsive-two-col">
-        {/* Left Column: Live Viewfinder & Token Scanner Input */}
+        {/* Left Column: Live Camera Scanner & Viewfinder */}
         <div className="glass-panel" style={{ padding: '24px' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <QrCode size={18} color="var(--cardzo-blue)" /> Optical Scanner & Viewfinder
-          </h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <QrCode size={18} color="var(--cardzo-blue)" /> Optical Camera Scanner
+            </h2>
+            {isCameraActive ? (
+              <button
+                onClick={stopCamera}
+                className="btn-danger"
+                style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+              >
+                <CameraOff size={14} /> Stop Camera
+              </button>
+            ) : (
+              <button
+                onClick={startCamera}
+                className="btn-primary"
+                style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+              >
+                <Camera size={14} /> Open Scanner
+              </button>
+            )}
+          </div>
 
           {/* Scanner Viewfinder Box */}
           <div style={{
-            height: '240px',
+            minHeight: '260px',
             borderRadius: 'var(--radius-md)',
-            background: 'radial-gradient(circle at center, rgba(10, 132, 255, 0.08) 0%, rgba(0,0,0,0.85) 100%)',
-            border: '2px dashed rgba(10, 132, 255, 0.4)',
+            background: '#000000',
+            border: isCameraActive ? '2px solid #30D158' : '2px dashed rgba(10, 132, 255, 0.4)',
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             overflow: 'hidden',
-            marginBottom: '20px'
+            marginBottom: '18px'
           }}>
-            {/* Animated Laser Scanning Line */}
-            <div style={{
-              position: 'absolute',
-              top: '20%',
-              left: '10%',
-              right: '10%',
-              height: '2px',
-              background: 'linear-gradient(90deg, transparent, #0A84FF, #30D158, transparent)',
-              boxShadow: '0 0 16px #30D158',
-              animation: 'pulseGlow 1.8s infinite ease-in-out'
-            }} />
+            {/* The HTML5 QR Code Mount Element */}
+            <div
+              id="garud-qr-reader"
+              style={{
+                width: '100%',
+                display: isCameraActive ? 'block' : 'none',
+                overflow: 'hidden'
+              }}
+            />
 
-            <div style={{
-              width: '130px',
-              height: '130px',
-              border: '2px solid rgba(255,255,255,0.2)',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(255, 255, 255, 0.02)'
-            }}>
-              <QrCode size={56} style={{ opacity: 0.35, color: '#FFFFFF' }} />
-            </div>
+            {/* Standby State when camera is NOT running */}
+            {!isCameraActive && (
+              <div
+                onClick={startCamera}
+                style={{
+                  width: '100%',
+                  height: '260px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  background: 'radial-gradient(circle at center, rgba(10, 132, 255, 0.12) 0%, rgba(0,0,0,0.9) 100%)',
+                  padding: '20px'
+                }}
+              >
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  background: 'rgba(10, 132, 255, 0.15)',
+                  border: '2px solid rgba(10, 132, 255, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '14px',
+                  boxShadow: '0 0 24px rgba(10, 132, 255, 0.3)'
+                }}>
+                  <Camera size={38} color="#0A84FF" />
+                </div>
+                <div style={{ fontWeight: 700, fontSize: '0.98rem', color: '#FFFFFF' }}>
+                  Tap to Activate Camera Scanner
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', textAlign: 'center' }}>
+                  Uses your mobile/webcam lens to instantly detect & verify student passes
+                </div>
+              </div>
+            )}
 
-            <div style={{ marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-secondary)', letterSpacing: '0.04em' }}>
-              ALIGN CARDZO DYNAMIC PASS IN FRAME
-            </div>
+            {/* Camera error notification if access was denied */}
+            {cameraError && (
+              <div style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '10px',
+                right: '10px',
+                background: 'rgba(239, 68, 68, 0.9)',
+                color: '#FFFFFF',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                textAlign: 'center'
+              }}>
+                {cameraError}
+              </div>
+            )}
           </div>
 
-          {/* Token input & Quick Generator for demonstration */}
+          {/* Action Row & Manual Input Fallback */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '10px' }}>
               <input
                 type="text"
-                placeholder="Scan or enter CRDZ- dynamic token..."
+                placeholder="Scan or enter CRDZ- dynamic pass token..."
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
                 style={{
@@ -194,12 +358,19 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                 }}
               />
               <button
-                onClick={() => handleVerify()}
-                disabled={scanning || !tokenInput}
+                onClick={() => {
+                  if (tokenInput.trim()) {
+                    handleVerify();
+                  } else {
+                    startCamera();
+                  }
+                }}
+                disabled={scanning}
                 className="btn-primary"
-                style={{ whiteSpace: 'nowrap' }}
+                style={{ whiteSpace: 'nowrap', gap: '6px' }}
               >
-                {scanning ? 'Verifying...' : 'Scan / Process'}
+                <Camera size={16} />
+                {scanning ? 'Verifying...' : tokenInput.trim() ? 'Verify Token' : 'Open Camera'}
               </button>
             </div>
 
@@ -211,10 +382,12 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
               border: '1px solid var(--border-glass)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '8px'
             }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Need a live token to test state transition?
+                Testing without a second device?
               </span>
               <button
                 onClick={fetchLiveStudentToken}
@@ -227,6 +400,8 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
             </div>
           </div>
         </div>
+
+
 
         {/* Right Column: High-Contrast Immediate Result Display */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

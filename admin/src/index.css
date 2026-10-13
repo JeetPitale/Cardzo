@@ -446,3 +446,21 @@ input, select, textarea {
   }
 }
 
+/* HTML5 QR Camera Scanner Viewfinder */
+#garud-qr-reader {
+  width: 100% !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+#garud-qr-reader video {
+  width: 100% !important;
+  height: 260px !important;
+  object-fit: cover !important;
+  border-radius: var(--radius-md) !important;
+}
+
+#garud-qr-reader img {
+  display: none !important;
+}
+
