@@ -71,9 +71,9 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
   };
 
   return (
-    <div style={{ padding: '0 24px 32px' }}>
+    <div className="responsive-page">
       {/* Header and Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div className="responsive-header">
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>User & Identity Directory</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem' }}>
@@ -81,7 +81,7 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <button onClick={() => setShowBulkModal(true)} className="btn-secondary">
             <Upload size={16} /> Bulk Roster CSV Import
           </button>
@@ -106,8 +106,8 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
       )}
 
       {/* Filters Bar */}
-      <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'center' }}>
-        <div style={{ flex: 1, position: 'relative' }}>
+      <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 220px', position: 'relative' }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
@@ -126,7 +126,7 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Role:</span>
           {['ALL', 'CARDHOLDER', 'GARUD', 'ADMIN'].map((role) => (
             <button
@@ -149,8 +149,8 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
       </div>
 
       {/* Users Table */}
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+      <div className="glass-panel table-responsive-container">
+        <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
           <thead>
             <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid var(--border-glass)' }}>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>Cardholder / Name</th>

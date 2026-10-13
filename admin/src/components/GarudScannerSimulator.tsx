@@ -89,10 +89,10 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
   }, []);
 
   return (
-    <div style={{ padding: '0 24px 32px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div className="responsive-page">
+      <div className="responsive-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: '1.6rem', fontWeight: 800 }}>Garud Verifier Terminal</h1>
             <span className="badge badge-warning">🛡️ AUTHORIZED OPERATOR MODE</span>
           </div>
@@ -123,7 +123,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '24px' }}>
+      <div className="responsive-two-col">
         {/* Left Column: Live Viewfinder & Token Scanner Input */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>

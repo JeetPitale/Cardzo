@@ -48,8 +48,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ sessions, auditL
   };
 
   return (
-    <div style={{ padding: '0 24px 32px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div className="responsive-page">
+      <div className="responsive-header">
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Attendance & Campus Turnstile Ledger</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem' }}>
@@ -58,7 +58,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ sessions, auditL
         </div>
 
         {/* Tab Switcher */}
-        <div style={{ display: 'flex', gap: '8px', background: 'rgba(255, 255, 255, 0.05)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+        <div style={{ display: 'flex', gap: '8px', background: 'rgba(255, 255, 255, 0.05)', padding: '4px', borderRadius: 'var(--radius-md)', flexWrap: 'wrap' }}>
           <button
             onClick={() => setActiveTab('sessions')}
             style={{
@@ -133,8 +133,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ sessions, auditL
           </div>
 
           {/* Sessions Table */}
-          <div className="glass-panel" style={{ overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+          <div className="glass-panel table-responsive-container">
+            <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid var(--border-glass)' }}>
                   <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>Cardholder</th>
@@ -189,8 +189,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ sessions, auditL
         </>
       ) : (
         /* Audit Trail Table */
-        <div className="glass-panel" style={{ overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+        <div className="glass-panel table-responsive-container">
+          <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
             <thead>
               <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid var(--border-glass)' }}>
                 <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>Timestamp</th>

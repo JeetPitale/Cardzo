@@ -22,19 +22,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate
 }) => {
   return (
-    <div style={{ padding: '0 24px 32px' }}>
+    <div className="responsive-page">
       {/* Hero Welcome & Tagline */}
       <div className="glass-panel" style={{
-        padding: '24px 32px',
+        padding: '24px',
         marginBottom: '24px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '16px',
         background: 'linear-gradient(135deg, rgba(10, 132, 255, 0.12) 0%, rgba(94, 92, 230, 0.08) 100%)',
         border: '1px solid rgba(10, 132, 255, 0.25)'
       }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: '1.8rem', fontWeight: 800 }}>Institutional Command Center</h1>
             <span className="badge badge-success">● SYSTEM ONLINE</span>
           </div>
@@ -43,7 +45,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <button onClick={() => onNavigate('garud-scanner')} className="btn-primary">
             <Shield size={18} />
             Open Garud Scanner
@@ -55,12 +57,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* KPI Metrics Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-        gap: '16px',
-        marginBottom: '28px'
-      }}>
+      <div className="stats-grid">
         {/* Metric 1 */}
         <div className="glass-panel" style={{ padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -123,7 +120,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Main Grid: Live Gate Stream & System Architecture */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px' }}>
+      <div className="responsive-two-col">
         {/* Left Column: Live Campus Attendance Stream */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>

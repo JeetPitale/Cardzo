@@ -55,8 +55,8 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ credentials, u
   };
 
   return (
-    <div style={{ padding: '0 24px 32px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    <div className="responsive-page">
+      <div className="responsive-header">
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Credential Lifecycle Management</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem' }}>
@@ -70,7 +70,7 @@ export const CredentialsView: React.FC<CredentialsViewProps> = ({ credentials, u
       </div>
 
       {/* Grid of Credentials */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
         {credentials.map((cred) => {
           const isVerified = cred.isVerified;
           const isPhysical = cred.isScannedPhysical;

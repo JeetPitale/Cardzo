@@ -227,6 +227,92 @@ input, select, textarea {
    RESPONSIVE DESIGN & MOBILE BREAKPOINTS
    ============================================================ */
 
+/* Page Layout Wrappers */
+.responsive-page {
+  padding: 0 24px 32px;
+}
+
+.responsive-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.responsive-two-col {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.role-tabs-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 720px;
+  margin-bottom: 20px;
+  z-index: 1;
+}
+
+.login-inputs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.mobile-wallet-container {
+  padding: 0 24px 32px;
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.mobile-phone-frame {
+  width: 380px;
+  min-height: 760px;
+  background: #030712;
+  border-radius: 52px;
+  border: 10px solid #1F2937;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-header-bar {
+  padding: 48px 20px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wallet-side-panel {
+  max-width: 420px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.table-responsive-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Medium Screens & Tablets (max-width: 960px) */
 @media (max-width: 960px) {
   .desktop-nav {
@@ -242,14 +328,36 @@ input, select, textarea {
     padding: 10px 16px !important;
   }
 
-  .role-tabs-container {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px !important;
+  .responsive-two-col {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .mobile-wallet-container {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 24px !important;
   }
 }
 
 /* Mobile Devices (max-width: 640px) */
 @media (max-width: 640px) {
+  .responsive-page {
+    padding: 0 12px 24px !important;
+  }
+
+  .responsive-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    margin-bottom: 20px !important;
+  }
+
   .navbar-subtitle {
     display: none;
   }
@@ -268,6 +376,42 @@ input, select, textarea {
     gap: 8px !important;
   }
 
+  .login-card {
+    padding: 20px 16px !important;
+  }
+
+  .login-inputs-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .mobile-wallet-container {
+    padding: 0 8px 24px !important;
+    width: 100% !important;
+  }
+
+  .mobile-phone-frame {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    border-radius: 24px !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  .dynamic-island-pill {
+    display: none !important;
+  }
+
+  .mobile-header-bar {
+    padding: 18px 16px 12px !important;
+  }
+
+  .wallet-side-panel {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
   .glass-panel {
     border-radius: var(--radius-md) !important;
   }
@@ -280,13 +424,19 @@ input, select, textarea {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Reduce hero headings */
+  /* Headings on mobile */
   h1 {
-    font-size: 1.4rem !important;
+    font-size: 1.35rem !important;
   }
 
   h2 {
-    font-size: 1.2rem !important;
+    font-size: 1.15rem !important;
+  }
+
+  .persona-switcher-box select {
+    max-width: 95px !important;
+    font-size: 0.72rem !important;
+    padding: 4px 4px !important;
   }
 }
 

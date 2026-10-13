@@ -205,15 +205,7 @@ export const RoleLoginView: React.FC<RoleLoginViewProps> = ({ onLoginSuccess }) 
       </div>
 
       {/* Role Selector Tabs */}
-      <div className="role-tabs-container" style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '10px',
-        width: '100%',
-        maxWidth: '720px',
-        marginBottom: '20px',
-        zIndex: 1
-      }}>
+      <div className="role-tabs-container">
         {(['ADMIN', 'GARUD', 'CARDHOLDER'] as PortalRole[]).map((role) => {
           const isSelected = selectedRole === role;
           const meta = ROLE_METADATA[role];
@@ -267,10 +259,9 @@ export const RoleLoginView: React.FC<RoleLoginViewProps> = ({ onLoginSuccess }) 
       </div>
 
       {/* Main Login Card */}
-      <div className="glass-panel" style={{
+      <div className="glass-panel login-card" style={{
         width: '100%',
         maxWidth: '720px',
-        padding: '32px',
         zIndex: 1,
         border: `1px solid ${activeMeta.accentColor}33`,
         boxShadow: `0 16px 48px -12px rgba(0, 0, 0, 0.6), 0 0 24px -8px ${activeMeta.accentColor}22`
@@ -370,7 +361,7 @@ export const RoleLoginView: React.FC<RoleLoginViewProps> = ({ onLoginSuccess }) 
 
         {/* Credentials Form */}
         <form onSubmit={(e) => { e.preventDefault(); executeLogin(email, password); }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+          <div className="login-inputs-grid">
             <div>
               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
                 Institutional Email Address

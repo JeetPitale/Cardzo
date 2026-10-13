@@ -184,22 +184,11 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
   };
 
   return (
-    <div style={{ padding: '0 24px 32px', display: 'flex', gap: '32px', alignItems: 'flex-start', justifyContent: 'center' }}>
-      {/* Mobile Device Mockup Frame (Apple iPhone 16 Pro Style) */}
-      <div style={{
-        width: '380px',
-        minHeight: '760px',
-        background: '#030712',
-        borderRadius: '52px',
-        border: '10px solid #1F2937',
-        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.1)',
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {/* Dynamic Island Pill */}
-        <div style={{
+    <div className="mobile-wallet-container">
+      {/* Mobile Device Mockup Frame (Adapts to real phones naturally) */}
+      <div className="mobile-phone-frame">
+        {/* Dynamic Island Pill (Hidden on mobile screens) */}
+        <div className="dynamic-island-pill" style={{
           width: '110px',
           height: '28px',
           background: '#000000',
@@ -219,12 +208,7 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
         </div>
 
         {/* Mobile Header Bar */}
-        <div style={{
-          padding: '48px 20px 12px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
+        <div className="mobile-header-bar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <img src="/assets/cardzo-logo.png" alt="logo" style={{ width: '28px', height: '28px', borderRadius: '7px' }} />
             <span style={{ fontSize: '1.15rem', fontWeight: 800 }}>Wallet</span>
@@ -596,7 +580,7 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
       </div>
 
       {/* Feature Guide Panel Next to Phone Mockup */}
-      <div style={{ maxWidth: '420px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="wallet-side-panel">
         <div className="glass-panel" style={{ padding: '24px' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '10px' }}>Apple Wallet-Inspired Experience</h2>
           <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
