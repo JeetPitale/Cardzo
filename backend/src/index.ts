@@ -30,22 +30,32 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use('/assets', express.static(path.join(__dirname, '../../assets')));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// API Routes
-app.use('/api/auth', authRouter);
-app.use('/api/cards', cardsRouter);
-app.use('/api/qr', qrRouter);
-app.use('/api/attendance', attendanceRouter);
-app.use('/api/garud', garudRouter);
-app.use('/api/admin', adminRouter);
+// API Routes (mounted under both /api and root to guarantee routing across all deployment topologies)
+const apiRoutes = [
+  { path: 'auth', router: authRouter },
+  { path: 'cards', router: cardsRouter },
+  { path: 'qr', router: qrRouter },
+  { path: 'attendance', router: attendanceRouter },
+  { path: 'garud', router: garudRouter },
+  { path: 'admin', router: adminRouter }
+];
+
+apiRoutes.forEach(({ path: routePath, router }) => {
+  app.use(`/api/${routePath}`, router);
+  app.use(`/${routePath}`, router);
+});
 
 // Health check
-app.get('/health', (req, res) => {
+const handleHealth = (req: any, res: any) => {
   res.json({
     status: 'healthy',
     system: 'Cardzo Identity & Attendance Engine',
+    database: 'Neon PostgreSQL',
     timestamp: new Date().toISOString()
   });
-});
+};
+app.get('/health', handleHealth);
+app.get('/api/health', handleHealth);
 
 // 404 handler
 app.use((req, res) => {
