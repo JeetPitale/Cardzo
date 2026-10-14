@@ -55,14 +55,14 @@ router.get('/users', async (req: Request, res: Response): Promise<void> => {
     const { search, role } = req.query;
 
     const where: any = {};
-    if (role) {
+    if (role && role !== 'ALL') {
       where.role = String(role);
     }
     if (search) {
       where.OR = [
-        { name: { contains: String(search) } },
-        { email: { contains: String(search) } },
-        { identifierNumber: { contains: String(search) } }
+        { name: { contains: String(search), mode: 'insensitive' } },
+        { email: { contains: String(search), mode: 'insensitive' } },
+        { identifierNumber: { contains: String(search), mode: 'insensitive' } }
       ];
     }
 
@@ -87,6 +87,161 @@ router.get('/users', async (req: Request, res: Response): Promise<void> => {
     res.json({ users });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch users.' });
+  }
+});
+
+// Create a single User
+router.post('/users', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name, email, password, role = 'CARDHOLDER', department, identifierNumber } = req.body;
+
+    if (!name || !email) {
+      res.status(400).json({ error: 'Name and email are required.' });
+      return;
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      res.status(409).json({ error: 'A user with this email address already exists.' });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password || 'Password123!', 10);
+
+    const newUser = await prisma.user.create({
+      data: {
+        name,
+        email,
+        passwordHash,
+        role: role.toUpperCase(),
+        department: department || 'General',
+        identifierNumber: identifierNumber || null,
+        institutionId: req.user!.institutionId || null
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        department: true,
+        identifierNumber: true,
+        avatarUrl: true,
+        createdAt: true
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'USER_CREATED',
+        targetType: 'USER',
+        targetId: newUser.id,
+        details: `Created new ${newUser.role} user: ${newUser.name} (${newUser.email})`,
+        ipAddress: req.ip
+      }
+    });
+
+    res.status(201).json({ message: 'User created successfully.', user: newUser });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create user.' });
+  }
+});
+
+// Update User Details
+router.patch('/users/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const { name, email, department, identifierNumber, role, password } = req.body;
+
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'User not found.' });
+      return;
+    }
+
+    const data: any = {};
+    if (name) data.name = name;
+    if (department !== undefined) data.department = department;
+    if (identifierNumber !== undefined) data.identifierNumber = identifierNumber;
+    if (role && ['CARDHOLDER', 'GARUD', 'ADMIN'].includes(role)) data.role = role;
+
+    if (email && email !== existing.email) {
+      const emailInUse = await prisma.user.findUnique({ where: { email } });
+      if (emailInUse) {
+        res.status(409).json({ error: 'Email is already taken by another account.' });
+        return;
+      }
+      data.email = email;
+    }
+
+    if (password) {
+      data.passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        department: true,
+        identifierNumber: true,
+        avatarUrl: true,
+        updatedAt: true
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'USER_UPDATED',
+        targetType: 'USER',
+        targetId: updatedUser.id,
+        details: `Updated details for ${updatedUser.name} (${updatedUser.email})`,
+        ipAddress: req.ip
+      }
+    });
+
+    res.json({ message: 'User updated successfully.', user: updatedUser });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update user.' });
+  }
+});
+
+// Delete User
+router.delete('/users/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+
+    if (id === req.user!.id) {
+      res.status(400).json({ error: 'You cannot delete your own administrative account.' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      res.status(404).json({ error: 'User not found.' });
+      return;
+    }
+
+    await prisma.user.delete({ where: { id } });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'USER_DELETED',
+        targetType: 'USER',
+        targetId: id,
+        details: `Deleted user: ${user.name} (${user.email})`,
+        ipAddress: req.ip
+      }
+    });
+
+    res.json({ message: 'User and associated records deleted successfully.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete user.' });
   }
 });
 
@@ -166,6 +321,27 @@ router.post('/users/bulk-import', async (req: Request, res: Response): Promise<v
     res.json({ message: `Successfully imported ${createdCount} users.`, createdCount });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Bulk import failed.' });
+  }
+});
+
+// List All Credentials across the institution
+router.get('/credentials', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const credentials = await prisma.credential.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true, department: true, identifierNumber: true }
+        },
+        institution: {
+          select: { id: true, name: true, code: true }
+        }
+      }
+    });
+
+    res.json({ credentials });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch credentials.' });
   }
 });
 
@@ -256,21 +432,51 @@ router.patch('/credentials/:id/status', async (req: Request, res: Response): Pro
   }
 });
 
+// Delete Credential permanently as Admin
+router.delete('/credentials/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const cred = await prisma.credential.findUnique({ where: { id } });
+
+    if (!cred) {
+      res.status(404).json({ error: 'Credential not found.' });
+      return;
+    }
+
+    await prisma.credential.delete({ where: { id } });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'CREDENTIAL_DELETED',
+        targetType: 'CREDENTIAL',
+        targetId: id,
+        details: `Permanently deleted credential "${cred.title}" for ${cred.cardholderName}`,
+        ipAddress: req.ip
+      }
+    });
+
+    res.json({ message: 'Credential deleted successfully.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete credential.' });
+  }
+});
+
 // All Attendance Sessions (with filters)
 router.get('/attendance', async (req: Request, res: Response): Promise<void> => {
   try {
     const { status, search } = req.query;
 
     const where: any = {};
-    if (status) {
+    if (status && status !== 'ALL') {
       where.status = String(status);
     }
     if (search) {
       where.user = {
         OR: [
-          { name: { contains: String(search) } },
-          { email: { contains: String(search) } },
-          { identifierNumber: { contains: String(search) } }
+          { name: { contains: String(search), mode: 'insensitive' } },
+          { email: { contains: String(search), mode: 'insensitive' } },
+          { identifierNumber: { contains: String(search), mode: 'insensitive' } }
         ]
       };
     }

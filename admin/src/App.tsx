@@ -9,12 +9,14 @@ import { MobileWalletPreview } from './components/MobileWalletPreview';
 import { RoleLoginView } from './components/RoleLoginView';
 import { api } from './api';
 import { User, Credential, AttendanceSession, AuditLog } from './types';
-import { AlertTriangle, Lock, Shield } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem('cardzo_active_tab') || 'dashboard' : 'dashboard';
+  });
+  const [loading, setLoading] = useState(true);
 
   // App Data
   const [metrics, setMetrics] = useState({
@@ -32,32 +34,102 @@ export const App: React.FC = () => {
   // Single-device revocation state
   const [sessionRevokedNotice, setSessionRevokedNotice] = useState(false);
 
-  const loadAllData = async () => {
+  const loadAllData = async (user?: User | null) => {
+    const active = user !== undefined ? user : currentUser;
     try {
-      // Load Analytics
-      const analytics = await api.request('/admin/analytics').catch(() => null);
-      if (analytics?.metrics) {
-        setMetrics(analytics.metrics);
-        setAuditLogs(analytics.recentAudits || []);
+      if (active?.role === 'ADMIN') {
+        // Load Analytics
+        const analytics = await api.request('/admin/analytics').catch(() => null);
+        if (analytics?.metrics) {
+          setMetrics(analytics.metrics);
+          setAuditLogs(analytics.recentAudits || []);
+        }
+
+        // Load Users
+        const usersRes = await api.request('/admin/users').catch(() => null);
+        if (usersRes?.users) setUsers(usersRes.users);
+
+        // Load Attendance
+        const attRes = await api.request('/admin/attendance').catch(() => null);
+        if (attRes?.sessions) setSessions(attRes.sessions);
+
+        // Load Audit Logs
+        const auditRes = await api.request('/admin/audit-logs').catch(() => null);
+        if (auditRes?.logs) setAuditLogs(auditRes.logs);
+
+        // Load all credentials across institution
+        const credsRes = await api.request('/admin/credentials').catch(() => ({ credentials: [] }));
+        setCredentials(credsRes.credentials || []);
+      } else if (active?.role === 'GARUD') {
+        // Verifier needs attendance and analytics
+        const attRes = await api.request('/admin/attendance').catch(() => null);
+        if (attRes?.sessions) setSessions(attRes.sessions);
+      } else {
+        // Cardholder loads own wallet passes
+        const cardsRes = await api.request('/cards').catch(() => ({ cards: [] }));
+        setCredentials(cardsRes.cards || []);
       }
-
-      // Load Users
-      const usersRes = await api.request('/admin/users').catch(() => null);
-      if (usersRes?.users) setUsers(usersRes.users);
-
-      // Load Attendance
-      const attRes = await api.request('/admin/attendance').catch(() => null);
-      if (attRes?.sessions) setSessions(attRes.sessions);
-
-      // Load Audit Logs
-      const auditRes = await api.request('/admin/audit-logs').catch(() => null);
-      if (auditRes?.logs) setAuditLogs(auditRes.logs);
-
-      // Load credentials
-      const cardsRes = await api.request('/cards').catch(() => ({ cards: [] }));
-      setCredentials(cardsRes.cards || []);
     } catch (err) {
       console.error('Failed to load portal data:', err);
+    }
+  };
+
+  // Restore authenticated session on page refresh
+  useEffect(() => {
+    const restoreSession = async () => {
+      const token = api.getToken();
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await api.request('/auth/me');
+        if (res?.user) {
+          setCurrentUser(res.user);
+          const savedTab = localStorage.getItem('cardzo_active_tab');
+          if (savedTab) {
+            setActiveTab(savedTab);
+          } else if (res.user.role === 'GARUD') {
+            setActiveTab('garud-scanner');
+          } else if (res.user.role === 'CARDHOLDER') {
+            setActiveTab('mobile-wallet');
+          } else {
+            setActiveTab('dashboard');
+          }
+          await loadAllData(res.user);
+        } else {
+          api.setToken(null);
+        }
+      } catch (err: any) {
+        console.warn('Session expired or invalidated:', err.message);
+        api.setToken(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+  // Real-time synchronization polling every 8s when user is authenticated
+  useEffect(() => {
+    if (!currentUser) return;
+
+    loadAllData(currentUser);
+
+    const interval = setInterval(() => {
+      loadAllData(currentUser);
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  // Synchronize activeTab changes to localStorage
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('cardzo_active_tab', newTab);
     }
   };
 
@@ -65,16 +137,15 @@ export const App: React.FC = () => {
     setCurrentUser(user);
     setSessionRevokedNotice(false);
 
-    // Set initial active tab based on role
+    let nextTab = 'dashboard';
     if (user.role === 'GARUD') {
-      setActiveTab('garud-scanner');
+      nextTab = 'garud-scanner';
     } else if (user.role === 'CARDHOLDER') {
-      setActiveTab('mobile-wallet');
-    } else {
-      setActiveTab('dashboard');
+      nextTab = 'mobile-wallet';
     }
+    handleTabChange(nextTab);
 
-    await loadAllData();
+    await loadAllData(user);
   };
 
   const handleQuickSwitchUser = async (email: string) => {
@@ -95,15 +166,15 @@ export const App: React.FC = () => {
       api.setToken(res.token);
       setCurrentUser(res.user);
 
+      let nextTab = 'dashboard';
       if (res.user.role === 'GARUD') {
-        setActiveTab('garud-scanner');
+        nextTab = 'garud-scanner';
       } else if (res.user.role === 'CARDHOLDER') {
-        setActiveTab('mobile-wallet');
-      } else {
-        setActiveTab('dashboard');
+        nextTab = 'mobile-wallet';
       }
+      handleTabChange(nextTab);
 
-      await loadAllData();
+      await loadAllData(res.user);
     } catch (err: any) {
       console.error('Quick switch error:', err);
     } finally {
@@ -118,6 +189,9 @@ export const App: React.FC = () => {
       // ignore
     }
     api.setToken(null);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('cardzo_active_tab');
+    }
     setCurrentUser(null);
     setSessionRevokedNotice(false);
   };
@@ -128,6 +202,25 @@ export const App: React.FC = () => {
       setSessionRevokedNotice(true);
     });
   }, []);
+
+  // Loading indicator during initial session check
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0B0F19',
+        color: '#FFFFFF',
+        gap: '16px'
+      }}>
+        <Loader2 size={36} className="animate-spin" color="#0A84FF" />
+        <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)' }}>Connecting to Cardzo Database...</p>
+      </div>
+    );
+  }
 
   // If user is not authenticated, show Role-Based Authentication Gateway
   if (!currentUser) {
@@ -177,7 +270,7 @@ export const App: React.FC = () => {
       <Navbar
         currentUser={currentUser}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         onQuickSwitchUser={handleQuickSwitchUser}
         onLogout={handleLogout}
       />
@@ -189,28 +282,28 @@ export const App: React.FC = () => {
             metrics={metrics}
             recentSessions={sessions}
             recentAudits={auditLogs}
-            onNavigate={(tab) => setActiveTab(tab)}
+            onNavigate={(tab) => handleTabChange(tab)}
           />
         )}
 
         {activeTab === 'users' && (
-          <UsersView users={users} onRefresh={loadAllData} />
+          <UsersView users={users} onRefresh={() => loadAllData(currentUser)} />
         )}
 
         {activeTab === 'credentials' && (
-          <CredentialsView credentials={credentials} users={users} onRefresh={loadAllData} />
+          <CredentialsView credentials={credentials} users={users} onRefresh={() => loadAllData(currentUser)} />
         )}
 
         {activeTab === 'attendance' && (
-          <AttendanceView sessions={sessions} auditLogs={auditLogs} onRefresh={loadAllData} />
+          <AttendanceView sessions={sessions} auditLogs={auditLogs} onRefresh={() => loadAllData(currentUser)} />
         )}
 
         {activeTab === 'garud-scanner' && (
-          <GarudScannerSimulator onRefreshData={loadAllData} />
+          <GarudScannerSimulator onRefreshData={() => loadAllData(currentUser)} />
         )}
 
         {activeTab === 'mobile-wallet' && (
-          <MobileWalletPreview onRefreshParent={loadAllData} />
+          <MobileWalletPreview currentUser={currentUser} onRefreshParent={() => loadAllData(currentUser)} />
         )}
       </main>
 

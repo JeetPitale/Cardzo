@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Search, UserPlus, Shield, ShieldCheck, ShieldAlert, Upload, Check } from 'lucide-react';
+import { Users, Search, UserPlus, Shield, ShieldCheck, ShieldAlert, Upload, Check, Trash2, Edit2, X, Plus } from 'lucide-react';
 import { User } from '../types';
 import { api } from '../api';
 
@@ -12,12 +12,25 @@ export const UsersView: React.FC<UsersViewProps> = ({ users, onRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  // Add User Form State
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('Password123!');
+  const [newRole, setNewRole] = useState<'CARDHOLDER' | 'GARUD' | 'ADMIN'>('CARDHOLDER');
+  const [newDepartment, setNewDepartment] = useState('Computer Science');
+  const [newIdentifier, setNewIdentifier] = useState('');
+
+  // Bulk Modal State
   const [bulkCsvText, setBulkCsvText] = useState(
 `Rohan Gupta,rohan@cardzo.io,Mechanical Engineering,ME-2023-0881,CARDHOLDER
 Ananya Sen,ananya@cardzo.io,Data Science & AI,DS-2024-0342,CARDHOLDER
 Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
   );
-  const [importing, setImporting] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const filteredUsers = users.filter((u) => {
@@ -45,8 +58,77 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await api.request('/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newName,
+          email: newEmail,
+          password: newPassword,
+          role: newRole,
+          department: newDepartment,
+          identifierNumber: newIdentifier
+        })
+      });
+      setShowAddModal(false);
+      setNewName('');
+      setNewEmail('');
+      setNewIdentifier('');
+      setStatusMessage('User created successfully in database!');
+      setTimeout(() => setStatusMessage(null), 4000);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Failed to create user.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setSubmitting(true);
+    try {
+      await api.request(`/admin/users/${editingUser.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: editingUser.name,
+          email: editingUser.email,
+          role: editingUser.role,
+          department: editingUser.department,
+          identifierNumber: editingUser.identifierNumber
+        })
+      });
+      setEditingUser(null);
+      setStatusMessage('User details updated successfully!');
+      setTimeout(() => setStatusMessage(null), 3000);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update user.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete user "${userName}"? This will remove all their credentials and sessions.`)) {
+      return;
+    }
+    try {
+      await api.request(`/admin/users/${userId}`, { method: 'DELETE' });
+      setStatusMessage(`User "${userName}" was permanently removed.`);
+      setTimeout(() => setStatusMessage(null), 3000);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete user.');
+    }
+  };
+
   const handleBulkImport = async () => {
-    setImporting(true);
+    setSubmitting(true);
     try {
       const lines = bulkCsvText.trim().split('\n');
       const parsedUsers = lines.map((line) => {
@@ -66,7 +148,7 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
     } catch (err: any) {
       alert(err.message || 'Failed to import roster.');
     } finally {
-      setImporting(false);
+      setSubmitting(false);
     }
   };
 
@@ -77,11 +159,14 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>User & Identity Directory</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem' }}>
-            Manage campus cardholders, institutional staff, and authorized Garud gate verifiers.
+            Full CRUD management of campus cardholders, institutional staff, and authorized Garud gate verifiers.
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button onClick={() => setShowAddModal(true)} className="btn-primary">
+            <Plus size={16} /> Add User
+          </button>
           <button onClick={() => setShowBulkModal(true)} className="btn-secondary">
             <Upload size={16} /> Bulk Roster CSV Import
           </button>
@@ -150,15 +235,15 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
 
       {/* Users Table */}
       <div className="glass-panel table-responsive-container">
-        <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+        <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
           <thead>
             <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid var(--border-glass)' }}>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>Cardholder / Name</th>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>ID / Roll Number</th>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>Department</th>
-              <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>Role & Permissions</th>
+              <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>Role</th>
               <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>Credentials</th>
-              <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right' }}>Role Assignment</th>
+              <th style={{ padding: '14px 20px', color: 'var(--text-secondary)', fontWeight: 600, textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -193,58 +278,273 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
                 </td>
                 <td style={{ padding: '16px 20px' }}>
                   <span className={`badge ${user.role === 'ADMIN' ? 'badge-blue' : user.role === 'GARUD' ? 'badge-warning' : 'badge-neutral'}`}>
-                    {user.role === 'GARUD' ? '🛡️ GARUD VERIFIER' : user.role === 'ADMIN' ? '👑 ADMIN' : 'CARDHOLDER'}
+                    {user.role === 'GARUD' ? '🛡️ GARUD' : user.role === 'ADMIN' ? '👑 ADMIN' : 'CARDHOLDER'}
                   </span>
                 </td>
                 <td style={{ padding: '16px 20px', color: 'var(--text-secondary)' }}>
                   {user._count?.credentials || 0} passes
                 </td>
                 <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                  {user.role === 'CARDHOLDER' ? (
+                  <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                    {user.role === 'CARDHOLDER' ? (
+                      <button
+                        onClick={() => handleRoleChange(user.id, 'GARUD')}
+                        title="Promote to Garud Gate Verifier"
+                        style={{
+                          background: 'rgba(245, 158, 11, 0.15)',
+                          border: '1px solid rgba(245, 158, 11, 0.4)',
+                          color: '#FBBF24',
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        Make Garud
+                      </button>
+                    ) : user.role === 'GARUD' ? (
+                      <button
+                        onClick={() => handleRoleChange(user.id, 'CARDHOLDER')}
+                        title="Revoke Garud Role"
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.4)',
+                          color: '#F87171',
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        Demote
+                      </button>
+                    ) : null}
+
                     <button
-                      onClick={() => handleRoleChange(user.id, 'GARUD')}
-                      style={{
-                        background: 'rgba(245, 158, 11, 0.15)',
-                        border: '1px solid rgba(245, 158, 11, 0.4)',
-                        color: '#FBBF24',
-                        padding: '6px 12px',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
+                      onClick={() => setEditingUser({ ...user })}
+                      title="Edit User"
+                      className="btn-secondary"
+                      style={{ padding: '6px 8px' }}
                     >
-                      <ShieldCheck size={14} /> Promote to Garud
+                      <Edit2 size={13} />
                     </button>
-                  ) : user.role === 'GARUD' ? (
+
                     <button
-                      onClick={() => handleRoleChange(user.id, 'CARDHOLDER')}
-                      style={{
-                        background: 'rgba(239, 68, 68, 0.15)',
-                        border: '1px solid rgba(239, 68, 68, 0.4)',
-                        color: '#F87171',
-                        padding: '6px 12px',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
+                      onClick={() => handleDeleteUser(user.id, user.name)}
+                      title="Delete User"
+                      className="btn-danger"
+                      style={{ padding: '6px 8px' }}
                     >
-                      <ShieldAlert size={14} /> Revoke Verifier
+                      <Trash2 size={13} />
                     </button>
-                  ) : (
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Institutional Admin</span>
-                  )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Add User Modal */}
+      {showAddModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100
+        }}>
+          <div className="glass-panel" style={{ width: '480px', padding: '28px', background: '#111827', border: '1px solid var(--border-glass)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Enroll New User</h2>
+              <button onClick={() => setShowAddModal(false)} style={{ background: 'transparent', border: 'none', color: '#9CA3AF', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUser}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="e.g. Maya Krishnan"
+                  style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Institutional Email</label>
+                <input
+                  type="email"
+                  required
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="e.g. maya@cardzo.io"
+                  style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Role</label>
+                  <select
+                    value={newRole}
+                    onChange={(e: any) => setNewRole(e.target.value)}
+                    style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                  >
+                    <option value="CARDHOLDER" style={{ background: '#111827' }}>Cardholder</option>
+                    <option value="GARUD" style={{ background: '#111827' }}>Garud Verifier</option>
+                    <option value="ADMIN" style={{ background: '#111827' }}>Admin</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Roll / ID Number</label>
+                  <input
+                    type="text"
+                    value={newIdentifier}
+                    onChange={(e) => setNewIdentifier(e.target.value)}
+                    placeholder="e.g. CS-2026-901"
+                    style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Department</label>
+                <input
+                  type="text"
+                  value={newDepartment}
+                  onChange={(e) => setNewDepartment(e.target.value)}
+                  placeholder="e.g. Computer Science"
+                  style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Initial Password</label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" onClick={() => setShowAddModal(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting} className="btn-primary">
+                  {submitting ? 'Creating...' : 'Enroll User'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100
+        }}>
+          <div className="glass-panel" style={{ width: '480px', padding: '28px', background: '#111827', border: '1px solid var(--border-glass)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Edit User Details</h2>
+              <button onClick={() => setEditingUser(null)} style={{ background: 'transparent', border: 'none', color: '#9CA3AF', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateUser}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editingUser.name}
+                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                  style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email</label>
+                <input
+                  type="email"
+                  required
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Role</label>
+                  <select
+                    value={editingUser.role}
+                    onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as any })}
+                    style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                  >
+                    <option value="CARDHOLDER" style={{ background: '#111827' }}>Cardholder</option>
+                    <option value="GARUD" style={{ background: '#111827' }}>Garud Verifier</option>
+                    <option value="ADMIN" style={{ background: '#111827' }}>Admin</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Roll / ID</label>
+                  <input
+                    type="text"
+                    value={editingUser.identifierNumber || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, identifierNumber: e.target.value })}
+                    style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Department</label>
+                <input
+                  type="text"
+                  value={editingUser.department || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, department: e.target.value })}
+                  style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', color: '#FFFFFF' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" onClick={() => setEditingUser(null)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting} className="btn-primary">
+                  {submitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Bulk Import Modal */}
       {showBulkModal && (
@@ -288,8 +588,8 @@ Officer Manoj Kumar,manoj@cardzo.io,Campus Security - Gate Beta,SEC-4091,GARUD`
               <button onClick={() => setShowBulkModal(false)} className="btn-secondary">
                 Cancel
               </button>
-              <button onClick={handleBulkImport} disabled={importing} className="btn-primary">
-                {importing ? 'Importing...' : 'Confirm & Enroll Users'}
+              <button onClick={handleBulkImport} disabled={submitting} className="btn-primary">
+                {submitting ? 'Importing...' : 'Confirm & Enroll Users'}
               </button>
             </div>
           </div>

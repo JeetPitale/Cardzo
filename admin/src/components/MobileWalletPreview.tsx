@@ -15,14 +15,15 @@ import {
   ShieldCheck,
   Plus
 } from 'lucide-react';
-import { Credential } from '../types';
+import { Credential, User } from '../types';
 import { api } from '../api';
 
 interface MobileWalletProps {
+  currentUser?: User | null;
   onRefreshParent: () => void;
 }
 
-export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshParent }) => {
+export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ currentUser, onRefreshParent }) => {
   const [cards, setCards] = useState<Credential[]>([]);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [flippedCardId, setFlippedCardId] = useState<string | null>(null);
@@ -43,38 +44,50 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
   const [newCardCategory, setNewCardCategory] = useState('Membership');
   const [savingCard, setSavingCard] = useState(false);
 
-  // Student auth token for mobile simulator (Aarav Sharma)
+  // Student auth token for mobile simulator
   const [studentToken, setStudentToken] = useState<string | null>(null);
 
   const initStudentSession = async () => {
     try {
-      const res = await fetch(`${api.getBaseUrl()}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'aarav@cardzo.io',
-          password: 'Password123!',
-          deviceId: 'iphone-16-pro-aarav',
-          deviceName: 'Aarav’s iPhone 16 Pro',
-          platform: 'ios'
-        })
-      });
-      const data = await res.json();
-      setStudentToken(data.token);
+      let tokenToUse: string | null = null;
 
-      // Load cards
-      const cardsRes = await fetch(`${api.getBaseUrl()}/cards`, {
-        headers: { Authorization: `Bearer ${data.token}` }
-      });
-      const cardsData = await cardsRes.json();
-      setCards(cardsData.cards || []);
+      if (currentUser && currentUser.role === 'CARDHOLDER') {
+        // Use active cardholder session directly without creating competing logins
+        tokenToUse = api.getToken();
+      } else {
+        // For admin previewing the student simulator, authenticate safely with a dedicated simulator device ID
+        const res = await fetch(`${api.getBaseUrl()}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: 'aarav@cardzo.io',
+            password: 'Password123!',
+            deviceId: 'cardzo-simulator-preview-device',
+            deviceName: 'Aarav’s iPhone Simulator',
+            platform: 'ios'
+          })
+        });
+        const data = await res.json();
+        tokenToUse = data.token;
+      }
 
-      // Load attendance state
-      const attRes = await fetch(`${api.getBaseUrl()}/attendance/current`, {
-        headers: { Authorization: `Bearer ${data.token}` }
-      });
-      const attData = await attRes.json();
-      setCurrentAttendance(attData);
+      setStudentToken(tokenToUse);
+
+      if (tokenToUse) {
+        // Load cards
+        const cardsRes = await fetch(`${api.getBaseUrl()}/cards`, {
+          headers: { Authorization: `Bearer ${tokenToUse}` }
+        });
+        const cardsData = await cardsRes.json();
+        setCards(cardsData.cards || []);
+
+        // Load attendance state
+        const attRes = await fetch(`${api.getBaseUrl()}/attendance/current`, {
+          headers: { Authorization: `Bearer ${tokenToUse}` }
+        });
+        const attData = await attRes.json();
+        setCurrentAttendance(attData);
+      }
     } catch (err) {
       console.error('Failed to init student session:', err);
     }
@@ -82,7 +95,7 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
 
   useEffect(() => {
     initStudentSession();
-  }, []);
+  }, [currentUser?.id]);
 
   // Countdown timer for active QR token
   useEffect(() => {
@@ -154,6 +167,7 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
     if (!studentToken) return;
     setSavingCard(true);
     try {
+      const holderName = (currentUser && currentUser.role === 'CARDHOLDER') ? currentUser.name : 'Aarav Sharma';
       await fetch(`${api.getBaseUrl()}/cards/scan`, {
         method: 'POST',
         headers: {
@@ -164,7 +178,7 @@ export const MobileWalletPreview: React.FC<MobileWalletProps> = ({ onRefreshPare
           title: newCardTitle,
           type: 'MEMBERSHIP',
           issuerName: 'Apex Arena & Campus Gym',
-          cardholderName: 'Aarav Sharma',
+          cardholderName: holderName,
           identifier: 'FIT-2024-' + Math.floor(1000 + Math.random() * 9000),
           category: newCardCategory,
           colorTheme: 'purple',

@@ -29,6 +29,9 @@ model User {
   attendanceEvents   AttendanceEvent[] @relation("UserAttendanceEvents")
   verifiedEvents     AttendanceEvent[] @relation("VerifierAttendanceEvents")
   auditLogs          AuditLog[]
+
+  @@index([role])
+  @@index([identifierNumber])
 }
 
 model Device {
@@ -61,6 +64,9 @@ model UserSession {
 
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   device        Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([isActive])
 }
 
 model Institution {
@@ -104,6 +110,10 @@ model Credential {
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   institution      Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
   qrTokens         QrToken[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([identifier])
 }
 
 model QrToken {
@@ -119,6 +129,9 @@ model QrToken {
 
   user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   credential          Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model AttendanceSession {
@@ -137,6 +150,10 @@ model AttendanceSession {
   user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   institution        Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
   events             AttendanceEvent[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([checkInTimestamp])
 }
 
 model AttendanceEvent {
@@ -153,6 +170,10 @@ model AttendanceEvent {
   session     AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user        User              @relation("UserAttendanceEvents", fields: [userId], references: [id], onDelete: Cascade)
   verifier    User?             @relation("VerifierAttendanceEvents", fields: [verifierId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([timestamp])
 }
 
 model AuditLog {
@@ -166,4 +187,7 @@ model AuditLog {
   timestamp  DateTime @default(now())
 
   actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([timestamp])
+  @@index([actorId])
 }
