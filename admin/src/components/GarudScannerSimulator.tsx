@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QrCode, Shield, CheckCircle2, XCircle, AlertTriangle, Clock, RefreshCw, Zap, ArrowRight, User, Camera, CameraOff, Video, FlipHorizontal, Image as ImageIcon } from 'lucide-react';
 import { api } from '../api';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import jsQR from 'jsqr';
 
 interface GarudScannerProps {
   onRefreshData: () => void;
@@ -19,7 +19,12 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([]);
   const [activeCamIndex, setActiveCamIndex] = useState(0);
-  const qrScannerRef = useRef<Html5Qrcode | null>(null);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isScanningRef = useRef<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Helper to fetch live token from Aarav for instant demo test
@@ -51,17 +56,65 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
     }
   };
 
-  const stopCamera = async () => {
-    try {
-      if (qrScannerRef.current && qrScannerRef.current.isScanning) {
-        await qrScannerRef.current.stop();
-      }
-      qrScannerRef.current = null;
-    } catch (err) {
-      console.warn('Error stopping scanner:', err);
-    } finally {
-      setIsCameraActive(false);
+  const stopCamera = () => {
+    isScanningRef.current = false;
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
     }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  // Decode frame using Native BarcodeDetector (instant on iOS/Safari & Chrome) with jsQR fallback
+  const decodeVideoFrame = async (video: HTMLVideoElement): Promise<string | null> => {
+    // 1. Native Hardware BarcodeDetector (Apple Vision / ML Kit)
+    if ('BarcodeDetector' in window) {
+      try {
+        const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+        const barcodes = await detector.detect(video);
+        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+          return barcodes[0].rawValue;
+        }
+      } catch (e) {
+        // Fallback to jsQR
+      }
+    }
+
+    // 2. jsQR Engine with adaptive binarization (great for screens & glare)
+    try {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      if (width > 0 && height > 0) {
+        if (!canvasRef.current) {
+          canvasRef.current = document.createElement('canvas');
+        }
+        const canvas = canvasRef.current;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, width, height);
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const code = jsQR(imageData.data, width, height, {
+            inversionAttempts: 'attemptBoth'
+          });
+          if (code && code.data) {
+            return code.data;
+          }
+        }
+      }
+    } catch (e) {
+      // Continue
+    }
+
+    return null;
   };
 
   const startCamera = async (targetIndex?: number) => {
@@ -69,72 +122,85 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
     setScanResult(null);
 
     try {
-      await stopCamera();
+      stopCamera();
 
-      // Query available cameras
+      // Query available video devices
       let devList = cameras;
       if (!devList || devList.length === 0) {
-        devList = await Html5Qrcode.getCameras().catch(() => []);
+        const allDevices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+        devList = allDevices
+          .filter(d => d.kind === 'videoinput')
+          .map(d => ({ id: d.deviceId, label: d.label || `Camera ${d.deviceId.slice(0, 5)}` }));
         setCameras(devList);
       }
 
-      const qrScanner = new Html5Qrcode('garud-qr-reader', {
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        verbose: false
-      });
-      qrScannerRef.current = qrScanner;
-
-      const qrCodeSuccessCallback = async (decodedText: string) => {
-        playScanBeep(true);
-        setTokenInput(decodedText);
-        await stopCamera();
-        handleVerify(decodedText);
-      };
-
-      const qrConfig = {
-        fps: 15,
-        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          return {
-            width: Math.floor(minEdge * 0.88),
-            height: Math.floor(minEdge * 0.88)
-          };
-        }
-      };
-
       const camIdx = typeof targetIndex === 'number' ? targetIndex : activeCamIndex;
-      if (devList && devList.length > 0) {
-        const selectedCam = devList[camIdx] || devList[0];
-        setActiveCamIndex(camIdx);
-        await qrScanner.start(
-          selectedCam.id,
-          qrConfig,
-          qrCodeSuccessCallback,
-          () => {}
-        );
-      } else {
-        // Fallback to constraints
-        try {
-          await qrScanner.start(
-            { facingMode: 'environment' },
-            qrConfig,
-            qrCodeSuccessCallback,
-            () => {}
-          );
-        } catch {
-          await qrScanner.start(
-            { facingMode: 'user' },
-            qrConfig,
-            qrCodeSuccessCallback,
-            () => {}
-          );
-        }
+      setActiveCamIndex(camIdx);
+
+      let constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
+
+      if (devList && devList.length > 0 && devList[camIdx]?.id) {
+        constraints = {
+          video: {
+            deviceId: { exact: devList[camIdx].id },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        };
       }
 
+      const stream = await navigator.mediaDevices.getUserMedia(constraints).catch(async () => {
+        return navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+          audio: false
+        }).catch(() => {
+          return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        });
+      });
+
+      streamRef.current = stream;
       setIsCameraActive(true);
+      isScanningRef.current = true;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+
+      // Continuous high-speed scan loop
+      const runScanLoop = async () => {
+        if (!isScanningRef.current || !videoRef.current) return;
+        const video = videoRef.current;
+
+        if (video.readyState >= 2) {
+          const detected = await decodeVideoFrame(video);
+          if (detected) {
+            playScanBeep(true);
+            setTokenInput(detected);
+            stopCamera();
+            handleVerify(detected);
+            return;
+          }
+        }
+
+        if (isScanningRef.current) {
+          animFrameRef.current = requestAnimationFrame(runScanLoop);
+        }
+      };
+
+      animFrameRef.current = requestAnimationFrame(runScanLoop);
     } catch (err: any) {
       console.error('Camera start error:', err);
       setIsCameraActive(false);
+      isScanningRef.current = false;
       setCameraError(err.message || 'Unable to access camera. Please check camera permissions in your browser.');
     }
   };
@@ -151,19 +217,50 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
 
     setScanning(true);
     try {
-      let scanner = qrScannerRef.current;
-      if (!scanner) {
-        scanner = new Html5Qrcode('garud-qr-reader', {
-          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-          verbose: false
-        });
-        qrScannerRef.current = scanner;
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas not supported');
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(objectUrl);
+
+      let detectedText: string | null = null;
+      if ('BarcodeDetector' in window) {
+        try {
+          const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+          const barcodes = await detector.detect(canvas);
+          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+            detectedText = barcodes[0].rawValue;
+          }
+        } catch (e) {}
       }
 
-      const decodedText = await scanner.scanFile(file, true);
-      playScanBeep(true);
-      setTokenInput(decodedText);
-      handleVerify(decodedText);
+      if (!detectedText) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'attemptBoth'
+        });
+        if (code && code.data) {
+          detectedText = code.data;
+        }
+      }
+
+      if (detectedText) {
+        playScanBeep(true);
+        setTokenInput(detectedText);
+        handleVerify(detectedText);
+      } else {
+        throw new Error('No QR detected');
+      }
     } catch (err: any) {
       playScanBeep(false);
       alert('Could not find a valid Cardzo QR code in this image. Please ensure the QR is clear and well-lit.');
@@ -247,9 +344,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
   useEffect(() => {
     loadRecentActivity();
     return () => {
-      if (qrScannerRef.current && qrScannerRef.current.isScanning) {
-        qrScannerRef.current.stop().catch(() => {});
-      }
+      stopCamera();
     };
   }, []);
 
@@ -262,7 +357,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
             <span className="badge badge-warning">🛡️ AUTHORIZED OPERATOR MODE</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', marginTop: '4px' }}>
-            Optical camera QR scanner for campus security and turnstile operators with zero-trust validation.
+            Hardware-accelerated optical QR scanner with Apple Vision & adaptive screen binarization.
           </p>
         </div>
 
@@ -359,19 +454,53 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                 backdropFilter: 'blur(8px)'
               }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#30D158', display: 'inline-block', boxShadow: '0 0 8px #30D158' }} />
-                <span>Live Optical Scanner Active</span>
+                <span>Live Hardware Scanner Active</span>
               </div>
             )}
 
-            {/* The HTML5 QR Code Mount Element */}
-            <div
-              id="garud-qr-reader"
+            {/* Direct High-Resolution HTML5 Video Feed */}
+            <video
+              ref={videoRef}
+              playsInline
+              autoPlay
+              muted
               style={{
                 width: '100%',
+                maxHeight: '380px',
                 display: isCameraActive ? 'block' : 'none',
-                overflow: 'hidden'
+                borderRadius: 'var(--radius-md)'
               }}
             />
+
+            {/* Targeting Reticle & Laser overlay when camera is running */}
+            {isCameraActive && (
+              <div style={{
+                position: 'absolute',
+                top: '15%',
+                bottom: '15%',
+                left: '12%',
+                right: '12%',
+                border: '2px dashed rgba(48, 209, 88, 0.7)',
+                borderRadius: '20px',
+                pointerEvents: 'none',
+                boxShadow: '0 0 24px rgba(48, 209, 88, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {/* Laser animation */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 0,
+                  right: 0,
+                  height: '2px',
+                  background: 'linear-gradient(90deg, transparent, #30D158, #0A84FF, transparent)',
+                  boxShadow: '0 0 12px #30D158',
+                  animation: 'pulseGlow 1.8s infinite ease-in-out'
+                }} />
+              </div>
+            )}
 
             {/* Standby State when camera is NOT running */}
             {!isCameraActive && (
@@ -407,7 +536,7 @@ export const GarudScannerSimulator: React.FC<GarudScannerProps> = ({ onRefreshDa
                   Tap to Activate Camera Scanner
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', textAlign: 'center' }}>
-                  Uses your mobile/webcam lens to instantly detect & verify student passes
+                  Hardware-accelerated instant pass detection with screen binarization
                 </div>
               </div>
             )}
