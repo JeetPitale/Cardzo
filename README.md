@@ -116,4 +116,7 @@ npm run dev
 | **Student Cardholder** | Aarav Sharma | `aarav@cardzo.io` | `Password123!` |
 | **Student Cardholder** | Priya Patel | `priya@cardzo.io` | `Password123!` |
 
+
+## OFFCAMPUS CODE : RXU5BK
+
 *(Use the quick persona switcher in the top right of the Web Admin Portal to seamlessly switch between identities.)*
